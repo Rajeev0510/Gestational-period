@@ -5,5 +5,6 @@ scikit-learn==1.2.2     # Match compatible version for numpy
 tensorflow==2.10.0      # Or other compatible version with numpy 1.23
 joblib
 matplotlib
+scikit-learn
 
 
