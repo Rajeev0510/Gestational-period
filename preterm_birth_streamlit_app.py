@@ -1,40 +1,60 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
 from sklearn.preprocessing import StandardScaler
 import joblib
 import matplotlib.pyplot as plt
 
 # Load Model and Updated Scaler
-model = joblib.load('preterm_birth_rf_model.pkl')
-scaler = joblib.load('scaler_updated.pkl')  # Use the updated scaler with 16 features
+@st.cache_resource  # Cache the model and scaler for performance
+def load_resources():
+    try:
+        model_path = os.path.join(os.path.dirname(__file__), 'preterm_birth_rf_model.pkl')
+        scaler_path = os.path.join(os.path.dirname(__file__), 'scaler_updated.pkl')
+
+        model = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)  # Use the updated scaler with 16 features
+        return model, scaler
+    except FileNotFoundError as e:
+        st.error(f"Missing file: {e}")
+        st.stop()
+
+model, scaler = load_resources()
 
 # Define the 16 Feature Names (excluding 'Prenatal_Care_Visits')
-features = ['Pregnancies', 'Age', 'BMI', 'BloodPressure', 'Glucose', 
+features = ['Pregnancies', 'Age', 'BMI', 'BloodPressure', 'Glucose',
             'Smoking', 'Previous_Preterm_Births', 'Gestational_Diabetes',
             'Genetic_Factors', 'Environmental_Factors',
             'PCOS', 'HIV', 'Zika_infection', 'Thyroid', 'Autoimmune_disease', 'Kidney_disease']
 
 # Prediction Function without Clipping
 def make_prediction(input_data):
-    input_data_scaled = scaler.transform(input_data)
-    prediction = model.predict(input_data_scaled)
-    return prediction[0]  # Return raw prediction without clipping
+    try:
+        input_data_scaled = scaler.transform(input_data)
+        prediction = model.predict(input_data_scaled)
+        return prediction[0]  # Return raw prediction without clipping
+    except Exception as e:
+        st.error(f"Error during prediction: {e}")
+        st.stop()
 
 # Function to Display Feature Importance
 def plot_feature_importance():
-    feature_importances = model.feature_importances_
-    importance_df = pd.DataFrame({'Feature': features, 'Importance': feature_importances})
-    importance_df = importance_df.sort_values(by='Importance', ascending=False)
+    try:
+        feature_importances = model.feature_importances_
+        importance_df = pd.DataFrame({'Feature': features, 'Importance': feature_importances})
+        importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
-    # Plot the feature importance
-    plt.figure(figsize=(10, 6))
-    plt.barh(importance_df['Feature'], importance_df['Importance'], color='skyblue')
-    plt.gca().invert_yaxis()
-    plt.xlabel("Importance Score")
-    plt.title("Feature Importance")
-    st.pyplot(plt)
-    plt.close()  # Close the plot after rendering to avoid duplication in Streamlit
+        # Plot the feature importance
+        plt.figure(figsize=(10, 6))
+        plt.barh(importance_df['Feature'], importance_df['Importance'], color='skyblue')
+        plt.gca().invert_yaxis()
+        plt.xlabel("Importance Score")
+        plt.title("Feature Importance")
+        st.pyplot(plt)
+        plt.close()  # Close the plot after rendering to avoid duplication in Streamlit
+    except AttributeError:
+        st.warning("Feature importance is not available for the loaded model.")
 
 # Main Application
 def main():
@@ -70,10 +90,8 @@ def main():
                                     previous_preterm_births, gestational_diabetes,
                                     genetic_factors, environmental_factors, pcos, hiv, zika_infection,
                                     thyroid, autoimmune_disease, kidney_disease]])
-            
-            # Make prediction without clipping
-            prediction = make_prediction(input_data)
 
+            prediction = make_prediction(input_data)
             st.success(f"Predicted Gestational Period: {prediction:.2f} days")
 
             # Display Feature Importance
@@ -86,33 +104,36 @@ def main():
         uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
         if uploaded_file is not None:
-            data = pd.read_csv(uploaded_file)
-            st.write("Uploaded CSV file:")
-            st.write(data.head())
+            try:
+                data = pd.read_csv(uploaded_file)
+                st.write("Uploaded CSV file:")
+                st.write(data.head())
 
-            # Check if all required columns are in the uploaded file
-            required_columns = set(features)
-            if required_columns.issubset(data.columns):
-                # Scale and predict
-                input_data_scaled = scaler.transform(data[features])
-                predictions = model.predict(input_data_scaled)  # Predict without clipping
+                # Check if all required columns are in the uploaded file
+                required_columns = set(features)
+                if required_columns.issubset(data.columns):
+                    # Scale and predict
+                    input_data_scaled = scaler.transform(data[features])
+                    predictions = model.predict(input_data_scaled)
 
-                # Add predictions to DataFrame
-                data['Predicted_Gestational_Period_Days'] = predictions
+                    # Add predictions to DataFrame
+                    data['Predicted_Gestational_Period_Days'] = predictions
 
-                st.write("Predictions:")
-                st.write(data[features + ['Predicted_Gestational_Period_Days']])
+                    st.write("Predictions:")
+                    st.write(data[features + ['Predicted_Gestational_Period_Days']])
 
-                # Display Feature Importance after batch prediction
-                st.write("### Feature Importance")
-                plot_feature_importance()
+                    # Display Feature Importance
+                    st.write("### Feature Importance")
+                    plot_feature_importance()
 
-                # Download predictions as CSV
-                csv_data = data.to_csv(index=False).encode('utf-8')
-                st.download_button("Download Predictions as CSV", data=csv_data, file_name='predictions.csv')
-            else:
-                missing_cols = required_columns - set(data.columns)
-                st.error(f"The uploaded file is missing required columns: {', '.join(missing_cols)}")
+                    # Download predictions as CSV
+                    csv_data = data.to_csv(index=False).encode('utf-8')
+                    st.download_button("Download Predictions as CSV", data=csv_data, file_name='predictions.csv')
+                else:
+                    missing_cols = required_columns - set(data.columns)
+                    st.error(f"The uploaded file is missing required columns: {', '.join(missing_cols)}")
+            except Exception as e:
+                st.error(f"Error processing the uploaded file: {e}")
 
 if __name__ == "__main__":
     main()
