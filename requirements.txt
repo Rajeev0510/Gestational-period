@@ -1,11 +1,8 @@
 streamlit
-numpy==1.23.5           # Specify a stable version of numpy
-pandas==1.5.3           # Match compatible version for numpy
-scikit-learn==1.2.2     # Match compatible version for numpy
-tensorflow==2.10.0      # Or other compatible version with numpy 1.23
-joblib
-matplotlib
-scikit-learn
+numpy==1.23.5
+pandas==1.5.3
+scikit-learn==1.2.2
+tensorflow==2.12.0   # Compatible with Python 3.11
+joblib==1.2.0
+matplotlib==3.6.2
 
-
-scikit-learn
